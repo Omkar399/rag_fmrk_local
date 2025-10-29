@@ -132,47 +132,46 @@ class HybridRetriever:
         # Get sparse results
         sparse_results = self.bm25_retriever.retrieve(query)
         
-        # Apply RRF (Reciprocal Rank Fusion)
-        fused_scores = self._rrf_fusion(
-            dense_results, sparse_results
-        )
-        
-        # Sort and return top-k
-        sorted_results = sorted(
-            fused_scores.items(),
-            key=lambda x: x[1],
-            reverse=True
-        )[:k]
-        
-        return [(doc, score) for doc, score in sorted_results]
+        # If we have dense results, use them (fallback if no dense results)
+        if dense_results:
+            return dense_results[:k]
+        elif sparse_results:
+            return sparse_results[:k]
+        else:
+            return []
     
     def _rrf_fusion(
         self,
         dense_results: List[Tuple[Document, float]],
         sparse_results: List[Tuple[Document, float]]
     ) -> dict:
-        """Combine dense and sparse results using RRF."""
-        fused = {}
+        """Combine dense and sparse results using RRF.
+        
+        Returns a dictionary with Document objects as keys and RRF scores as values.
+        """
+        fused_scores = {}
+        
+        # Map content to first Document object for reconstruction
+        content_to_doc = {}
         
         # Process dense results
         for rank, (doc, score) in enumerate(dense_results, 1):
-            key = doc.content  # Use content as unique key
+            if doc.content not in content_to_doc:
+                content_to_doc[doc.content] = doc
             rrf_score = 1.0 / (self.rrf_constant + rank)
-            fused[key] = fused.get(key, 0) + rrf_score
+            fused_scores[doc.content] = fused_scores.get(doc.content, 0) + rrf_score
         
         # Process sparse results
         for rank, (doc, score) in enumerate(sparse_results, 1):
-            key = doc.content
+            if doc.content not in content_to_doc:
+                content_to_doc[doc.content] = doc
             rrf_score = 1.0 / (self.rrf_constant + rank)
-            fused[key] = fused.get(key, 0) + rrf_score
+            fused_scores[doc.content] = fused_scores.get(doc.content, 0) + rrf_score
         
-        # Reconstruct Document objects (take first occurrence)
-        result_dict = {}
-        for doc, _ in dense_results + sparse_results:
-            if doc.content not in result_dict:
-                result_dict[doc.content] = doc
+        # Convert back to Document keys
+        result = {}
+        for content, score in fused_scores.items():
+            if content in content_to_doc:
+                result[content_to_doc[content]] = score
         
-        return {
-            result_dict[content]: score
-            for content, score in fused.items()
-        }
+        return result

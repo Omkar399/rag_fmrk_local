@@ -1,0 +1,10 @@
+{
+  "session_id": "2330c74a-b77f-4be6-a7bc-271a08f98efb",
+  "created": "2025-10-29T10:43:12.194762",
+  "updated": "2025-10-29T10:43:30.214723",
+  "documents": [
+    "local_modular_rag_pipeline.md"
+  ],
+  "indexed_chunks": 21,
+  "total_size_bytes": 7967
+}

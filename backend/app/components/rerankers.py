@@ -3,6 +3,10 @@
 from typing import List, Tuple
 from app.interfaces import Document
 from app.registry import register
+import warnings
+
+# Suppress tokenizer warnings from FlagEmbedding
+warnings.filterwarnings("ignore", message=".*XLMRobertaTokenizerFast.*")
 
 
 @register("rerank.bge")
