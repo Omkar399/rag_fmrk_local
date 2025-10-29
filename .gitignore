@@ -39,6 +39,7 @@ wheels/
 chroma_db/
 chroma_db_fast/
 data/
+sessions/
 *.log
 
 # Model cache
