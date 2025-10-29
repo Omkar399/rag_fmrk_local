@@ -1,437 +1,355 @@
 # 🧠 Local Modular RAG Pipeline
 
-A **fully local**, **modular**, and **experiment-friendly** Retrieval-Augmented Generation (RAG) pipeline built with modern open-source components. Swap components freely via YAML configuration, run completely offline, and never send your data to the cloud.
+A **fully local**, **modular**, and **production-ready** Retrieval-Augmented Generation (RAG) system with a **modern Next.js UI**, **FastAPI backend**, and **LM Studio integration**. Build powerful chat applications with your own documents—no cloud, no API keys, complete offline operation.
 
 ## ✨ Features
 
-- ✅ **Fully Modular** - Swap any component via YAML (embedder, chunker, retriever, reranker, LLM)
+- ✅ **Modern Web UI** - Beautiful Next.js + Tailwind CSS + shadcn/ui interface with dark mode
+- ✅ **Session Management** - Isolated document contexts per user session
+- ✅ **Document Upload** - Upload PDFs/TXT/MD/HTML directly in the UI
+- ✅ **Local LLM** - Integrate with LM Studio or Ollama for private inference
+- ✅ **Modular Backend** - Swap components via YAML (embedder, chunker, retriever, reranker)
 - ✅ **Hybrid Retrieval** - Dense (embeddings) + Sparse (BM25) with RRF fusion
-- ✅ **Cross-Encoder Reranking** - BGE reranker for semantic relevance
-- ✅ **Context Compression** - Intelligent sentence-level compression with token budgets
-- ✅ **Local LLM Support** - Integrate with Ollama or use mock generator for testing
-- ✅ **Persistent Storage** - Chroma vector store for reusable indexes
-- ✅ **Offline-First** - Zero network dependencies after model downloads
-- ✅ **Interactive CLI** - Query your knowledge base interactively
-- ✅ **Production-Ready** - CLI arguments, logging, error handling
-
-## 🚀 Quick Start
-
-### 1. Prerequisites
-
-- Python >=3.10
-- `uv` package manager (install from https://github.com/astral-sh/uv)
-
-### 2. Install Dependencies with `uv`
-
-```bash
-# Install all dependencies in one command
-uv sync
-
-# Or activate the environment for development
-source .venv/bin/activate  # Linux/Mac
-# or .venv\Scripts\activate on Windows
-```
-
-### 3. Prepare Your Data
-
-Create a `data/` directory with your documents:
-
-```bash
-mkdir data
-# Add PDF, HTML, TXT, or MD files to data/
-# Examples:
-# - data/document.pdf
-# - data/guide.md
-# - data/webpage.html
-```
-
-### 4. Run the Pipeline
-
-```bash
-# Interactive mode (index, then query)
-python -m app.pipeline
-
-# Or with fast CPU config
-python -m app.pipeline --config app/configs/fast.yaml
-
-# Index and query directly
-python -m app.pipeline --index --query "What is this about?"
-```
+- ✅ **Fast Performance** - Optimized for speed (250-300 token generations, ~0.2s temperature)
+- ✅ **Markdown Support** - Rich formatting in chat (lists, code blocks, bold, etc.)
+- ✅ **REST API** - FastAPI backend for easy integration
+- ✅ **Persistent Storage** - Chroma vector store with session isolation
+- ✅ **Offline-First** - Zero network dependencies after setup
 
 ## 📁 Project Structure
 
 ```
-app/
-├── __init__.py
-├── interfaces.py          # Abstract interfaces for components
-├── registry.py            # Plugin registration system
-├── pipeline.py            # Main orchestration logic
-├── components/
-│   ├── __init__.py
-│   ├── loaders.py         # Document loading (PDF, HTML, TXT, MD)
-│   ├── chunkers.py        # Text splitting strategies
-│   ├── embedders.py       # Text embeddings (HuggingFace)
-│   ├── stores.py          # Vector storage (Chroma)
-│   ├── retrievers.py      # Retrieval (Dense, BM25, Hybrid)
-│   ├── rerankers.py       # Reranking (BGE, NoOp)
-│   ├── compressors.py     # Context compression
-│   ├── generators.py      # LLM generation (Ollama, Mock)
-│   └── prompts.py         # Prompt templates
-├── configs/
-│   ├── default.yaml       # Full-featured config
-│   └── fast.yaml          # CPU-optimized config
-data/
-├── document.pdf           # Your documents here
-├── guide.md
-└── webpage.html
-chroma_db/                 # Persistent vector store (auto-created)
+rag_frmk/
+├── backend/                          # Python FastAPI backend
+│   ├── api.py                        # REST API endpoints
+│   ├── app/
+│   │   ├── interfaces.py             # Component protocols
+│   │   ├── registry.py               # Plugin system
+│   │   ├── pipeline.py               # RAG orchestration
+│   │   ├── components/
+│   │   │   ├── loaders.py            # Document loading
+│   │   │   ├── chunkers.py           # Text splitting
+│   │   │   ├── embedders.py          # Embeddings (BGE)
+│   │   │   ├── stores.py             # Chroma vector store
+│   │   │   ├── retrievers.py         # Dense/BM25/Hybrid
+│   │   │   ├── rerankers.py          # BGE reranking
+│   │   │   ├── generators.py         # LM Studio/Ollama
+│   │   │   └── prompts.py            # Prompt templates
+│   │   └── configs/
+│   │       ├── default.yaml          # Production config
+│   │       └── fast.yaml             # CPU-optimized config
+│   └── services/
+│       ├── session_manager.py        # Session lifecycle
+│       ├── document_service.py       # Upload & indexing
+│       ├── chat_service.py           # Query interface
+│       └── storage_service.py        # File operations
+│
+├── frontend/
+│   ├── nextjs/                       # Modern Next.js UI
+│   │   ├── app/
+│   │   │   ├── page.tsx              # Main chat interface
+│   │   │   ├── layout.tsx            # Root layout
+│   │   │   └── globals.css           # Global styles
+│   │   ├── lib/
+│   │   │   ├── api.ts                # API client (Axios)
+│   │   │   └── store.ts              # State (Zustand)
+│   │   ├── components/ui/            # shadcn/ui components
+│   │   ├── package.json              # Node dependencies
+│   │   └── tailwind.config.ts        # Tailwind config
+│   │
+│   └── docs/
+│       ├── API.md                    # REST API documentation
+│       ├── LMSTUDIO_SETUP.md         # LM Studio setup guide
+│       └── LMSTUDIO_QUICK_START.txt  # Quick reference
+│
+├── sessions/                         # Session data (git-ignored)
+│   └── {session-id}/
+│       ├── documents/                # Uploaded files
+│       ├── chroma_db/                # Vector index
+│       ├── metadata.json             # Session info
+│       └── chat_history.json         # Messages
+│
+├── pyproject.toml                    # uv dependencies
+├── run_all.sh                        # Start backend + frontend
+├── NEXTJS_SETUP.md                   # Frontend setup guide
+└── PERFORMANCE_OPTIMIZATIONS.md      # Optimization details
 ```
+
+## 🚀 Quick Start
+
+### Prerequisites
+
+- **Python** >=3.10
+- **Node.js** >=18.16.0
+- **uv** package manager (https://github.com/astral-sh/uv)
+- **LM Studio** (https://lmstudio.ai/) - for local LLM inference
+
+### 1. Install Backend Dependencies
+
+```bash
+cd /Users/omkarpodey/rag_frmk
+uv sync
+```
+
+### 2. Install Frontend Dependencies
+
+```bash
+cd frontend/nextjs
+npm install
+```
+
+### 3. Setup LM Studio
+
+1. Download and install [LM Studio](https://lmstudio.ai/)
+2. Load a model (e.g., `qwen2.5-7b-instruct-1m`)
+3. Start the local server on `http://127.0.0.1:1234`
+
+Verify it's running:
+```bash
+curl http://localhost:1234/v1/models
+```
+
+### 4. Start Backend & Frontend
+
+**Option A: Use the provided script**
+```bash
+bash run_all.sh
+```
+
+**Option B: Start manually in separate terminals**
+
+Terminal 1 - Backend:
+```bash
+cd /Users/omkarpodey/rag_frmk
+uv run python -m uvicorn backend.api:app --host 0.0.0.0 --port 8000
+```
+
+Terminal 2 - Frontend:
+```bash
+cd /Users/omkarpodey/rag_frmk/frontend/nextjs
+npm run dev
+```
+
+### 5. Open in Browser
+
+Visit: **http://localhost:3000**
+
+## 💬 Using the Chat Interface
+
+1. **Create a Session** - Click "New Chat" to start
+2. **Upload Documents** - Drag & drop or click to upload PDFs/TXT/MD files
+3. **Index Documents** - Click "Index Documents" to process and embed
+4. **Ask Questions** - Type queries and get AI responses with source citations
+5. **View Sources** - See which documents the answer came from
 
 ## ⚙️ Configuration
 
-The pipeline is configured via YAML. Edit `app/configs/default.yaml` to customize:
+Edit `backend/app/configs/default.yaml` to customize:
 
-### Default Configuration (Best Quality)
-
+### Production Config (Best Quality)
 ```yaml
-loader: "load.fs"                    # Load from filesystem
-chunker: "chunk.sentence"            # Split at sentence boundaries
-embedder: "embed.hf"                 # HuggingFace embeddings
-  model: "BAAI/bge-small-en-v1.5"   # BGE small model
-store: "store.chroma"                # Persistent Chroma DB
-retriever: "retriever.hybrid"        # Hybrid dense + sparse
-  dense_top_k: 40
-  sparse_top_k: 40
-  fused_top_k: 10
-reranker: "rerank.bge"               # BGE cross-encoder
-compressor: "compress.sentences"     # Smart compression
-generator: "gen.ollama"              # Local LLM via Ollama
-  model: "llama3.1:8b"
+retriever:
+  component: "retriever.hybrid"
+  args:
+    dense_top_k: 15
+    sparse_top_k: 15
+    fused_top_k: 5
+
+reranker:
+  component: "rerank.noop"    # Optimized: skip expensive reranking
+  args:
+    top_k: 5
+
+generator:
+  component: "gen.lmstudio"
+  args:
+    model: "qwen2.5-7b-instruct-1m"
+    base_url: "http://127.0.0.1:1234"
+    max_tokens: 300            # Optimized for speed
+    temperature: 0.2           # Deterministic responses
 ```
 
-### Fast Configuration (CPU-Optimized)
-
-```yaml
-embedder: "embed.minilm"             # Lightweight MiniLM
-retriever: "retriever.dense"         # Dense only (faster)
-reranker: "rerank.noop"              # Skip reranking
-compressor: "compress.sentences"     # Still compress
-generator: "gen.mock"                # Testing without LLM
-```
-
-### Swap Components Easily
-
-| Goal | Change |
-|------|--------|
-| Use Mistral LLM | `generator.args.model: "mistral"` |
-| Disable reranking | `reranker.component: "rerank.noop"` |
-| CPU-only mode | Use `fast.yaml` config |
-| Larger context budget | `compressor.args.token_budget: 12000` |
-
-## 🎯 Usage Examples
-
-### Interactive Mode
-
-```bash
-python -m app.pipeline
-
-# Then at the prompt:
-Q> index                    # Build the index
-Q> What is this about?      # Query the knowledge base
-Q> info                     # Show configuration
-Q> exit                     # Exit
-```
-
-### Single Query
-
-```bash
-python -m app.pipeline --index --query "What are the main topics?"
-```
-
-### With Custom Config
-
-```bash
-python -m app.pipeline --config app/configs/fast.yaml --index
-```
-
-### Programmatic Usage
-
-```python
-from app.pipeline import RAGPipeline
-
-# Create pipeline
-pipeline = RAGPipeline("app/configs/default.yaml")
-
-# Index documents
-pipeline.index(clear_existing=True)
-
-# Query
-result = pipeline.query("What is this document about?")
-print(result.answer)
-print(result.source_citations)
-```
-
-## 📊 Pipeline Architecture
-
-```
-┌─────────────┐
-│   Loader    │  Load PDF/HTML/TXT/MD files
-└──────┬──────┘
-       │
-       ▼
-┌─────────────┐
-│  Chunker    │  Split into manageable pieces
-└──────┬──────┘
-       │
-       ▼
-┌─────────────┐
-│  Embedder   │  Generate dense embeddings
-└──────┬──────┘
-       │
-       ▼
-┌──────────────────┐
-│  Vector Store    │  Persistent Chroma DB
-│  (Chroma)        │
-└──────┬───────────┘
-       │
-       ├─────────────────────┬────────────────────┐
-       │                     │                    │
-       ▼                     ▼                    ▼
-  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐
-  │Dense Search │  │ BM25 Search │  │  (Future)   │
-  └────┬────────┘  └────┬────────┘  └─────┬───────┘
-       │                │                  │
-       └────────┬───────┴──────────────────┘
-                │
-                ▼
-         ┌────────────────┐
-         │ RRF Fusion     │  Combine results
-         └────┬───────────┘
-              │
-              ▼
-         ┌────────────────┐
-         │   Reranker     │  Semantic relevance ranking
-         │   (BGE)        │
-         └────┬───────────┘
-              │
-              ▼
-         ┌────────────────┐
-         │ Compressor     │  Token-budget compression
-         └────┬───────────┘
-              │
-              ▼
-         ┌────────────────┐
-         │  Generator     │  LLM answer generation
-         │  (Ollama)      │  with source citations
-         └────────────────┘
-```
-
-## 🔧 Advanced Configuration
-
-### Using Different Embeddings
-
+### CPU-Optimized Config
 ```yaml
 embedder:
   component: "embed.minilm"
-  args:
-    model_name: "sentence-transformers/all-MiniLM-L6-v2"
-```
-
-### Disable Reranking (Faster)
-
-```yaml
+retriever:
+  component: "retriever.dense"
 reranker:
   component: "rerank.noop"
-  args:
-    top_k: 5
 ```
 
-### Different Chunking Strategy
+## 🔌 REST API
 
-```yaml
-chunker:
-  component: "chunk.fixed"  # or "chunk.semantic"
-  args:
-    chunk_size: 1024
-    overlap: 200
-```
+Use the FastAPI backend directly without the UI:
 
-## 📦 Installing Additional Models
-
-### For BGE Embeddings (Recommended)
-
+### Create Session
 ```bash
-# Already included in dependencies
+curl -X POST http://localhost:8000/api/sessions
+# Returns: "abc123def456..."
 ```
 
-### For Ollama LLM Integration
-
+### Upload Documents
 ```bash
-# Install Ollama: https://ollama.com/download
-ollama pull llama3.1:8b   # ~4.7GB
-# or
-ollama pull mistral       # ~5GB
-ollama pull neural-chat   # ~4GB
+curl -X POST http://localhost:8000/api/sessions/{session_id}/documents/upload \
+  -F "files=@document.pdf"
 ```
 
-### Verify Ollama is Running
-
+### Index Documents
 ```bash
-# Should return "Ollama is running"
-curl http://localhost:11434/api/tags
+curl -X POST http://localhost:8000/api/sessions/{session_id}/documents/index
 ```
 
-## 🧪 Testing
-
-Run tests with:
-
+### Query
 ```bash
-pytest -v
+curl -X POST http://localhost:8000/api/sessions/{session_id}/chat \
+  -H "Content-Type: application/json" \
+  -d '{"query": "What is this about?"}'
 ```
 
-Or with the mock generator for quick testing (no LLM needed):
+See `docs/API.md` for complete endpoint documentation.
 
-```python
-pipeline = RAGPipeline("app/configs/fast.yaml")  # Uses mock generator
-pipeline.index()
-result = pipeline.query("Test query")
-print(result.answer)
+## 🎯 Pipeline Architecture
+
 ```
+Upload Documents
+       │
+       ▼
+┌──────────────────┐
+│  FSLoader        │  Load PDF/HTML/TXT/MD
+└────────┬─────────┘
+         │
+         ▼
+┌──────────────────┐
+│  SentenceChunker │  Split by sentences
+└────────┬─────────┘
+         │
+         ▼
+┌──────────────────┐
+│  BGEEmbedder     │  Generate embeddings
+└────────┬─────────┘
+         │
+         ▼
+┌──────────────────┐
+│  ChromaVectorStore  Session-specific index
+└────────┬─────────┘
+         │
+         ├──────────────────┬──────────────────┐
+         │                  │                  │
+         ▼                  ▼                  ▼
+    DenseRetriever   BM25Retriever      (RRF Fusion)
+         │                  │                  │
+         └──────────┬───────┴──────────────────┘
+                    │
+                    ▼
+           ┌────────────────┐
+           │  NoOpReranker  │  (Skip for speed)
+           └────────┬───────┘
+                    │
+                    ▼
+           ┌────────────────┐
+           │ Compressor     │  Token budget compression
+           └────────┬───────┘
+                    │
+                    ▼
+           ┌────────────────┐
+           │ LMStudioGenerator  Local LLM inference
+           └────────────────┘
+```
+
+## 🔧 Component Reference
+
+### Loaders
+- `load.fs` - Filesystem (PDF, HTML, TXT, MD)
+
+### Chunkers
+- `chunk.sentence` - Sentence boundaries
+- `chunk.semantic` - Semantic drift detection
+- `chunk.fixed` - Fixed size chunks
+
+### Embedders
+- `embed.hf` - BGE (BAAI/bge-small-en-v1.5)
+- `embed.minilm` - Lightweight MiniLM
+
+### Retrievers
+- `retriever.dense` - Embedding search
+- `retriever.bm25` - Keyword search
+- `retriever.hybrid` - Combined with RRF
+
+### Rerankers
+- `rerank.bge` - BGE cross-encoder
+- `rerank.noop` - No reranking (fast)
+
+### Generators
+- `gen.lmstudio` - LM Studio (http://127.0.0.1:1234)
+- `gen.ollama` - Ollama (http://localhost:11434)
+- `gen.mock` - Mock (testing)
 
 ## 🔍 Troubleshooting
 
-### "Module not found" errors
-
+### "Cannot connect to LM Studio"
 ```bash
-# Reinstall dependencies
+# Verify LM Studio is running
+curl http://localhost:1234/v1/models
+
+# If not running, start LM Studio app
+# or restart from terminal:
+# python -m lmstudio server
+```
+
+### "No documents indexed"
+1. Check documents uploaded successfully in UI
+2. Click "Index Documents" button
+3. Wait for indexing to complete (watch backend logs)
+
+### Module not found errors
+```bash
+cd /Users/omkarpodey/rag_frmk
 uv sync --reinstall
 ```
 
-### Ollama connection errors
-
+### Frontend won't connect to backend
 ```bash
-# Check if Ollama is running
-curl http://localhost:11434/api/tags
+# Check backend is running on port 8000
+lsof -i :8000
 
-# If not running, start it
-ollama serve
+# Check NEXT_PUBLIC_API_URL environment variable
+echo $NEXT_PUBLIC_API_URL  # Should be http://localhost:8000
 ```
 
-### Memory issues with large embeddings
+## 📊 Performance Optimizations
 
-Use the fast config with MiniLM:
+- **Max Tokens**: Reduced to 300 tokens (50-70% faster, same quality)
+- **Temperature**: 0.2 for deterministic, faster decoding
+- **Reranking**: Disabled (uses `rerank.noop`) - embeddings already high quality
+- **Retriever**: Reduced to top 5 documents
+- **Compression**: Intelligent sentence selection with token budgets
 
-```bash
-python -m app.pipeline --config app/configs/fast.yaml
-```
-
-### No documents found
-
-Ensure you have documents in the `data/` directory:
-
-```bash
-ls data/
-# Should show: document.pdf, guide.md, etc.
-```
-
-## 📚 Architecture Decisions
-
-### Why Chroma?
-- ✅ Persistent storage (survives restarts)
-- ✅ Easy setup (no external database)
-- ✅ Supports Cosine similarity + other metrics
-- ✅ Built-in Python integration
-
-### Why Hybrid Retrieval?
-- ✅ Dense: Captures semantic meaning
-- ✅ Sparse (BM25): Catches keywords
-- ✅ RRF Fusion: Balanced combination
-
-### Why BGE Reranker?
-- ✅ Cross-encoder model (more accurate than bi-encoder)
-- ✅ Understands query-document pairs
-- ✅ Significantly improves ranking
-
-## 🎓 Learning Resources
-
-- [LlamaIndex Core](https://docs.llamaindex.ai/)
-- [Chroma DB](https://docs.trychroma.com/)
-- [Sentence Transformers](https://www.sbert.net/)
-- [BGE Models](https://github.com/FlagOpen/FlagEmbedding)
-- [Ollama](https://ollama.com/)
-
-## 📋 Component Reference
-
-### Loaders
-- `load.fs` - Filesystem loader (PDF, HTML, TXT, MD)
-
-### Chunkers
-- `chunk.sentence` - Sentence boundary splitting
-- `chunk.semantic` - Semantic drift detection
-- `chunk.fixed` - Fixed-size chunks
-
-### Embedders
-- `embed.hf` - HuggingFace sentence-transformers (BGE small)
-- `embed.minilm` - Lightweight MiniLM
-
-### Vector Stores
-- `store.chroma` - Persistent Chroma database
-
-### Retrievers
-- `retriever.dense` - Embedding-based retrieval
-- `retriever.bm25` - Keyword-based retrieval
-- `retriever.hybrid` - Combined with RRF fusion
-
-### Rerankers
-- `rerank.bge` - BGE cross-encoder reranking
-- `rerank.noop` - No reranking (for speed)
-
-### Compressors
-- `compress.sentences` - Sentence selection with token budget
-- `compress.noop` - No compression
-
-### Generators
-- `gen.ollama` - Local LLM via Ollama
-- `gen.mock` - Mock generator for testing
-
-## 🔐 Privacy & Offline Operation
-
-- ✅ **No cloud dependencies** - Everything runs locally
-- ✅ **Models cached locally** - HuggingFace models in `~/.cache/huggingface`
-- ✅ **Data never leaves** - Vector store on your machine
-- ✅ **Ollama LLM** - Runs on localhost:11434
-- ✅ **Chroma persistence** - Your index stays local
-
-## 📈 Performance Tips
-
-1. **For fast CPU inference**: Use `app/configs/fast.yaml`
-2. **For GPU acceleration**: Ensure PyTorch has CUDA support
-3. **For large documents**: Increase chunk overlap
-4. **For better quality**: Increase `reranker.top_k` and `compressor.token_budget`
+See `PERFORMANCE_OPTIMIZATIONS.md` for details.
 
 ## 🚀 Roadmap
 
-- [ ] FAISS vector store backend
-- [ ] Multi-document summarization
-- [ ] Evaluation metrics (RAGAS)
-- [ ] Document update/deletion workflows
-- [ ] Web UI dashboard
-- [ ] Streaming responses
-- [ ] Multi-language support
-- [ ] Custom knowledge graph integration
+- [ ] Streaming chat responses
+- [ ] Document management (delete, update)
+- [ ] Export chat history
+- [ ] Multi-user support
+- [ ] Analytics dashboard
+- [ ] Voice input/output
+- [ ] Image understanding
+- [ ] Custom knowledge graphs
 
 ## 📝 License
 
-MIT License - see LICENSE file
+MIT License
 
 ## 🤝 Contributing
 
 Contributions welcome! Areas for improvement:
-- Additional loaders (CSV, JSON, Markdown tables)
+- Additional document loaders
 - More embedding models
 - Performance optimizations
-- Documentation improvements
-- Test coverage
+- UI/UX enhancements
+- Documentation
 
 ---
 
