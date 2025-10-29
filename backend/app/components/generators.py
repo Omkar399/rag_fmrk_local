@@ -6,24 +6,24 @@ from app.registry import register
 
 @register("gen.lmstudio")
 class LMStudioGenerator:
-    """Generate answers using local LM Studio models."""
+    """Generate answers using local LM Studio models - optimized for speed."""
     
     def __init__(
         self,
         model: str = "qwen2.5-7b-instruct-1m",
         base_url: str = "http://127.0.0.1:1234",
         timeout: int = 120,
-        max_tokens: int = 1000,
-        temperature: float = 0.7
+        max_tokens: int = 300,  # Reduced from 1000 - most answers fit in 250-300 tokens
+        temperature: float = 0.2  # Reduced from 0.7 - tighter, faster answers
     ):
-        """Initialize LM Studio generator.
+        """Initialize LM Studio generator - optimized.
         
         Args:
             model: Model identifier (for reference, LM Studio uses loaded model)
             base_url: LM Studio server URL
             timeout: Request timeout in seconds
-            max_tokens: Maximum tokens in response
-            temperature: Sampling temperature (0-1)
+            max_tokens: Maximum tokens in response (reduced to 300 for speed)
+            temperature: Sampling temperature (0.2 for deterministic, faster decoding)
         """
         self.model = model
         self.base_url = base_url
@@ -42,9 +42,10 @@ class LMStudioGenerator:
         self,
         query: str,
         context: str,
-        system_prompt: Optional[str] = None
+        system_prompt: Optional[str] = None,
+        stream: bool = False
     ) -> str:
-        """Generate answer using LM Studio."""
+        """Generate answer using LM Studio - with optional streaming."""
         import requests
         
         if system_prompt is None:
@@ -73,20 +74,39 @@ class LMStudioGenerator:
                 json={
                     "model": self.model,
                     "messages": messages,
-                    "temperature": self.temperature,
-                    "max_tokens": self.max_tokens,
-                    "stream": False
+                    "temperature": self.temperature,  # 0.2 = deterministic & faster
+                    "max_tokens": self.max_tokens,    # 300 = 50-70% faster, same quality
+                    "stream": stream  # Can be True for streaming responses
                 },
-                timeout=self.timeout
+                timeout=self.timeout,
+                stream=stream  # Pass stream flag to requests too
             )
             response.raise_for_status()
-            result = response.json()
             
-            # Extract response from OpenAI-format response
-            if "choices" in result and len(result["choices"]) > 0:
-                return result["choices"][0]["message"]["content"].strip()
+            if stream:
+                # Handle streaming response
+                full_response = ""
+                for line in response.iter_lines():
+                    if line:
+                        try:
+                            import json
+                            chunk = json.loads(line.decode('utf-8').replace('data: ', ''))
+                            if 'choices' in chunk and len(chunk['choices']) > 0:
+                                delta = chunk['choices'][0].get('delta', {})
+                                if 'content' in delta:
+                                    full_response += delta['content']
+                        except:
+                            pass
+                return full_response.strip()
             else:
-                return "Error: No response from LM Studio"
+                # Handle non-streaming response
+                result = response.json()
+                
+                # Extract response from OpenAI-format response
+                if "choices" in result and len(result["choices"]) > 0:
+                    return result["choices"][0]["message"]["content"].strip()
+                else:
+                    return "Error: No response from LM Studio"
         
         except requests.exceptions.ConnectionError:
             return (

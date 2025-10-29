@@ -47,50 +47,70 @@ class DocumentService:
         session_id: str,
         files: List[BinaryIO]
     ) -> Dict:
-        """Upload documents to session storage.
+        """Upload documents to session.
+        
+        Stores files in session-specific directory. Documents are NOT automatically
+        indexed - call index_session() after upload to run chunking/embedding.
         
         Args:
             session_id: Session ID
-            files: List of file objects (Streamlit UploadedFile or file-like objects)
+            files: List of file objects (from FastAPI UploadFile or Streamlit UploadedFile)
         
         Returns:
-            Dictionary with upload results
-            
+            Dictionary with upload results and any errors
+        
         Example:
-            >>> result = doc_service.upload_documents(session_id, files)
+            >>> result = doc_service.upload_documents(session_id, [file1, file2])
             >>> print(result['uploaded_count'])
             2
-            >>> print(result['uploaded_files'])
-            ['paper.pdf', 'guide.md']
+            >>> print(result['errors'])
+            []
         """
-        docs_path = self.session_manager.get_documents_path(session_id)
         uploaded_files = []
         errors = []
         
+        # Create session directory
+        docs_path = self.session_manager.get_documents_path(session_id)
+        docs_path.mkdir(parents=True, exist_ok=True)
+        print(f"📁 Session documents directory: {docs_path}")
+        
         for file in files:
-            try:
-                # Get filename - support both Streamlit UploadedFile (.name) and regular files (.filename)
-                filename = getattr(file, "name", None) or getattr(file, "filename", None)
-                if not filename:
-                    errors.append({"filename": "unknown", "error": "File must have name or filename attribute"})
-                    continue
-                
-                # Validate file
-                error = self._validate_file(file)
-                if error:
-                    errors.append({"filename": filename, "error": error})
-                    continue
-                
-                # Save file
-                file_path = docs_path / filename
-                with open(file_path, "wb") as f:
-                    f.write(file.read())
-                
-                uploaded_files.append(filename)
+            # Get filename - support both Streamlit UploadedFile (.name) and regular files (.filename)
+            filename = getattr(file, "name", None) or getattr(file, "filename", None)
+            if not filename:
+                errors.append({"filename": "unknown", "error": "File must have name or filename attribute"})
+                continue
             
+            print(f"📄 Processing: {filename}")
+            
+            error = self._validate_file(file)
+            if error:
+                print(f"  ❌ Validation error: {error}")
+                errors.append({"filename": filename, "error": error})
+                continue
+            
+            try:
+                # Reset file pointer to beginning
+                if hasattr(file, "seek"):
+                    file.seek(0)
+                
+                file_path = docs_path / filename
+                print(f"  💾 Saving to: {file_path}")
+                
+                with open(file_path, "wb") as f:
+                    content = file.read()
+                    f.write(content)
+                    file_size = len(content)
+                
+                print(f"  ✓ Saved {file_size} bytes")
+                uploaded_files.append(filename)
+                
             except Exception as e:
-                filename = getattr(file, "name", None) or getattr(file, "filename", None) or "unknown"
-                errors.append({"filename": filename, "error": str(e)})
+                error_msg = f"Failed to save file: {str(e)}"
+                print(f"  ❌ {error_msg}")
+                errors.append({"filename": filename, "error": error_msg})
+        
+        print(f"✅ Upload complete: {len(uploaded_files)} files uploaded, {len(errors)} errors")
         
         return {
             "uploaded_count": len(uploaded_files),
@@ -133,10 +153,9 @@ class DocumentService:
                     "session_id": session_id,
                 }
             
-            # Temporarily change the data directory in pipeline config
-            # by creating a session-specific config
-            import tempfile
+            # Import required modules
             import yaml
+            from pathlib import Path
             
             # Load default config
             config_path = Path(self.config_path)
@@ -146,19 +165,26 @@ class DocumentService:
             # Create session-specific pipeline
             pipeline = RAGPipeline(self.config_path)
             
-            # Override paths for this session
+            # Override loader path for this session
             pipeline.loader.data_dir = str(docs_path)
-            pipeline.vector_store.path = chroma_path
-            pipeline.vector_store.collection = None  # Reset collection
             
-            # Reinitialize vector store with session path
+            # Reinitialize vector store with session-specific path
+            # This ensures we use the session's own Chroma DB
             from app.components.stores import ChromaVectorStore
             pipeline.vector_store = ChromaVectorStore(
                 path=chroma_path,
                 collection_name="documents"
             )
             
-            # Index documents
+            # Clear existing data if any (important for re-indexing)
+            try:
+                pipeline.vector_store.clear()
+            except Exception as e:
+                # If clear fails (e.g., no collection exists yet), continue
+                print(f"  ℹ️  Note: {str(e)}")
+            
+            # Index documents with clear_existing=True to ensure fresh index
+            print(f"🔄 Indexing {len(list(docs_path.iterdir()))} documents for session {session_id}...")
             num_chunks = pipeline.index(clear_existing=True)
             
             # Get indexed documents
@@ -229,7 +255,7 @@ class DocumentService:
             session_id: Session ID
         
         Returns:
-            Dictionary with document information
+            Dictionary with document information including indexing status
         """
         docs_path = self.session_manager.get_documents_path(session_id)
         documents = []
@@ -246,11 +272,26 @@ class DocumentService:
                     })
                     total_size += size
         
+        # Check Chroma DB status
+        chroma_path = self.session_manager.get_chroma_db_path(session_id)
+        indexed_chunks = 0
+        try:
+            from app.components.stores import ChromaVectorStore
+            vector_store = ChromaVectorStore(
+                path=chroma_path,
+                collection_name="documents"
+            )
+            indexed_chunks = vector_store.get_count()
+        except Exception as e:
+            print(f"  ℹ️  Chroma DB status check: {str(e)}")
+        
         return {
             "session_id": session_id,
             "documents": documents,
             "document_count": len(documents),
             "total_size_bytes": total_size,
+            "indexed_chunks": indexed_chunks,
+            "is_indexed": indexed_chunks > 0,
         }
     
     def _validate_file(self, file) -> str:
