@@ -1,0 +1,128 @@
+================================================================================
+  🎯 LM STUDIO INTEGRATION - QUICK START
+================================================================================
+
+Your RAG pipeline is NOW CONFIGURED for LM Studio!
+
+URL: http://127.0.0.1:1234
+Model: qwen2.5-7b-instruct-1m
+
+================================================================================
+  📋 3-STEP SETUP
+================================================================================
+
+STEP 1: Install LM Studio
+  → Download from: https://lmstudio.ai/
+  → Or: brew install lmstudio
+
+STEP 2: Load the Model
+  → Open LM Studio
+  → Models tab → Search for "qwen2.5-7b-instruct-1m" → Download (7.7GB)
+  → Local Server tab → Select model → Click "Start Server"
+  → Server runs at http://127.0.0.1:1234
+
+STEP 3: Run Your RAG Pipeline
+  → cd /Users/omkarpodey/rag_frmk
+  → uv run python3 -m app.pipeline
+
+================================================================================
+  ✅ VERIFICATION
+================================================================================
+
+Check LM Studio is running:
+  $ curl http://127.0.0.1:1234/v1/models
+
+Expected response:
+  {"object":"list","data":[{"id":"qwen2.5-7b-instruct-1m",...}]}
+
+================================================================================
+  💻 USAGE EXAMPLES
+================================================================================
+
+INTERACTIVE MODE:
+  $ uv run python3 -m app.pipeline
+  Q> index                          # Build index
+  Q> What is this document about?   # Ask question (uses LM Studio)
+  Q> exit
+
+COMMAND LINE:
+  $ uv run python3 -m app.pipeline --index --query "Your question"
+
+PYTHON CODE:
+  from app.pipeline import RAGPipeline
+  
+  pipeline = RAGPipeline("app/configs/default.yaml")
+  pipeline.index()
+  result = pipeline.query("Your question")
+  print(result.answer)
+
+================================================================================
+  ⚙️  CONFIGURATION
+================================================================================
+
+Configured in: app/configs/default.yaml
+
+generator:
+  component: "gen.lmstudio"
+  args:
+    model: "qwen2.5-7b-instruct-1m"
+    base_url: "http://127.0.0.1:1234"
+    timeout: 120
+    max_tokens: 1000
+    temperature: 0.7
+
+To use a different model:
+  1. Load it in LM Studio
+  2. Update the "model:" line above
+  3. Restart the server
+
+================================================================================
+  🆘 TROUBLESHOOTING
+================================================================================
+
+ERROR: "Cannot connect to LM Studio"
+  → Make sure LM Studio is running with model loaded
+  → Go to Local Server tab and click "Start Server"
+
+ERROR: Model won't download
+  → Model is 7.7GB, check you have space
+  → Try downloading from LM Studio UI
+
+Slow responses (10-30 seconds)
+  → This is normal for local inference
+  → For faster results, use GPU acceleration in LM Studio
+
+Want a faster model?
+  → Try: mistral-7b-instruct (7.4GB, faster)
+  → Or: neural-chat-7b (7.4GB, balanced)
+
+================================================================================
+  📚 WHAT'S CONFIGURED
+================================================================================
+
+✅ Component: gen.lmstudio (NEW!)
+✅ URL: http://127.0.0.1:1234
+✅ Model: qwen2.5-7b-instruct-1m
+✅ API Format: OpenAI-compatible chat/completions
+✅ Config File: app/configs/default.yaml
+
+Other Generators Available:
+  → gen.ollama (for Ollama models)
+  → gen.mock (for testing without LLM)
+
+================================================================================
+  🚀 LET'S GO!
+================================================================================
+
+1. Download LM Studio from https://lmstudio.ai/
+2. Load model: qwen2.5-7b-instruct-1m (7.7GB)
+3. Start server in LM Studio
+4. Run: uv run python3 -m app.pipeline
+5. Type: Q> index
+6. Ask: Q> Your question
+
+That's it! Your RAG pipeline now uses LOCAL LM Studio! 🎉
+
+For detailed setup: See LMSTUDIO_SETUP.md
+
+================================================================================

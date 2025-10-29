@@ -1,0 +1,49 @@
+# Fast CPU-Optimized Configuration
+# Lightweight components for quick inference on limited hardware
+
+loader:
+  component: "load.fs"
+  args:
+    data_dir: "data"
+
+chunker:
+  component: "chunk.sentence"
+  args:
+    chunk_size: 256
+    overlap: 50
+
+embedder:
+  component: "embed.minilm"
+  args:
+    model_name: "sentence-transformers/all-MiniLM-L6-v2"
+
+store:
+  component: "store.chroma"
+  args:
+    path: "./chroma_db_fast"
+    collection_name: "documents"
+
+retriever:
+  component: "retriever.dense"
+  args:
+    top_k: 5
+
+reranker:
+  component: "rerank.noop"
+  args:
+    top_k: 5
+
+compressor:
+  component: "compress.sentences"
+  args:
+    token_budget: 2000
+
+generator:
+  component: "gen.mock"
+  args: {}
+
+prompt:
+  system: |
+    You are a helpful assistant.
+    Answer based on the context provided.
+    Keep answers concise.
