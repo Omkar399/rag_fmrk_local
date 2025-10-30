@@ -4,17 +4,27 @@ A **fully local**, **modular**, and **production-ready** Retrieval-Augmented Gen
 
 ## ✨ Features
 
+### 🎨 User Interface
 - ✅ **Modern Web UI** - Beautiful Next.js + Tailwind CSS + shadcn/ui interface with dark mode
-- ✅ **Session Management** - Isolated document contexts per user session
-- ✅ **Document Upload** - Upload PDFs/TXT/MD/HTML directly in the UI
-- ✅ **Local LLM** - Integrate with LM Studio or Ollama for private inference
-- ✅ **Modular Backend** - Swap components via YAML (embedder, chunker, retriever, reranker)
+- ✅ **Streaming Responses** - Real-time token-by-token streaming with visual feedback
+- ✅ **Session Management** - Named sessions with persistent storage and easy identification
+- ✅ **Document Upload** - Drag & drop PDFs/TXT/MD/HTML directly in the UI
+- ✅ **Markdown Support** - Rich formatting in chat (lists, code blocks, bold, tables, etc.)
+- ✅ **Session Cleanup** - Clear all sessions with confirmation dialog
+
+### 🧠 RAG Pipeline
+- ✅ **Smart Chunking** - Token-based chunking (300-600 tokens) with semantic boundary detection
+- ✅ **Rich Metadata** - Source paths, section titles, timestamps, doc types, and auto-summaries
 - ✅ **Hybrid Retrieval** - Dense (embeddings) + Sparse (BM25) with RRF fusion
+- ✅ **Local LLM** - Integrate with LM Studio or Ollama for private inference
+- ✅ **Auto-Recovery** - ChromaDB and model cache corruption detection and recovery
+- ✅ **Modular Backend** - Swap components via YAML (embedder, chunker, retriever, reranker)
+
+### 🚀 Performance & Privacy
 - ✅ **Fast Performance** - Optimized for speed (250-300 token generations, ~0.2s temperature)
-- ✅ **Markdown Support** - Rich formatting in chat (lists, code blocks, bold, etc.)
-- ✅ **REST API** - FastAPI backend for easy integration
 - ✅ **Persistent Storage** - Chroma vector store with session isolation
-- ✅ **Offline-First** - Zero network dependencies after setup
+- ✅ **Offline-First** - Zero network dependencies after setup, completely local
+- ✅ **REST API** - FastAPI backend with Server-Sent Events (SSE) streaming
 
 ## 📁 Project Structure
 
@@ -65,9 +75,9 @@ rag_frmk/
 ├── sessions/                         # Session data (git-ignored)
 │   └── {session-id}/
 │       ├── documents/                # Uploaded files
-│       ├── chroma_db/                # Vector index
-│       ├── metadata.json             # Session info
-│       └── chat_history.json         # Messages
+│       ├── chroma_db/                # Vector index (auto-recovered if corrupted)
+│       ├── metadata.json             # Session info (name, created, docs, chunks)
+│       └── chat_history.json         # Full chat messages with sources
 │
 ├── pyproject.toml                    # uv dependencies
 ├── run_all.sh                        # Start backend + frontend
@@ -136,11 +146,13 @@ Visit: **http://localhost:3000**
 
 ## 💬 Using the Chat Interface
 
-1. **Create a Session** - Click "New Chat" to start
-2. **Upload Documents** - Drag & drop or click to upload PDFs/TXT/MD files
-3. **Index Documents** - Click "Index Documents" to process and embed
-4. **Ask Questions** - Type queries and get AI responses with source citations
-5. **View Sources** - See which documents the answer came from
+1. **Create a Named Session** - Click "New Chat", give it a memorable name like "Research Notes"
+2. **Upload Documents** - Drag & drop or click to upload PDFs/TXT/MD/HTML files
+3. **Index Documents** - Click "Index Documents" to process with smart chunking
+4. **Ask Questions** - Type queries and watch responses stream in real-time
+5. **View Sources** - See which documents and sections the answer came from
+6. **Manage Sessions** - Switch between named sessions in the sidebar
+7. **Clear Sessions** - Use "Clear All Sessions" button to reset everything
 
 ## ⚙️ Configuration
 
@@ -148,6 +160,13 @@ Edit `backend/app/configs/default.yaml` to customize:
 
 ### Production Config (Best Quality)
 ```yaml
+chunker:
+  component: "chunk.smart-boundary"
+  args:
+    chunk_size_tokens: 450          # 300-600 token chunks
+    overlap_percentage: 0.12        # 12% overlap for context
+    model_name: "sentence-transformers/all-MiniLM-L6-v2"
+
 retriever:
   component: "retriever.hybrid"
   args:
@@ -167,40 +186,78 @@ generator:
     base_url: "http://127.0.0.1:1234"
     max_tokens: 300            # Optimized for speed
     temperature: 0.2           # Deterministic responses
+    # Note: streaming=True handled automatically for real-time responses
 ```
 
-### CPU-Optimized Config
+### CPU-Optimized Config (Fast)
 ```yaml
+chunker:
+  component: "chunk.smart-boundary"
+  args:
+    chunk_size_tokens: 300          # Smaller chunks for speed
+    overlap_percentage: 0.10        # 10% overlap
+    model_name: "sentence-transformers/all-MiniLM-L6-v2"
+
 embedder:
-  component: "embed.minilm"
+  component: "embed.minilm"         # Lightweight embedder
 retriever:
-  component: "retriever.dense"
+  component: "retriever.dense"      # Dense only (faster than hybrid)
 reranker:
-  component: "rerank.noop"
+  component: "rerank.noop"          # Skip reranking
 ```
 
 ## 🔌 REST API
 
 Use the FastAPI backend directly without the UI:
 
-### Create Session
+### Session Management
+
+**Create Named Session**
 ```bash
-curl -X POST http://localhost:8000/api/sessions
+curl -X POST http://localhost:8000/api/sessions \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Research Papers"}'
 # Returns: "abc123def456..."
 ```
 
-### Upload Documents
+**List All Sessions**
+```bash
+curl http://localhost:8000/api/sessions
+# Returns: [{"id": "abc...", "name": "Research Papers", "created": "2025-10-30T..."}, ...]
+```
+
+**Delete All Sessions**
+```bash
+curl -X DELETE http://localhost:8000/api/sessions
+```
+
+### Document Operations
+
+**Upload Documents**
 ```bash
 curl -X POST http://localhost:8000/api/sessions/{session_id}/documents/upload \
   -F "files=@document.pdf"
 ```
 
-### Index Documents
+**Index Documents**
 ```bash
 curl -X POST http://localhost:8000/api/sessions/{session_id}/documents/index
 ```
 
-### Query
+### Chat (Streaming)
+
+**Stream Response (SSE)**
+```bash
+curl -N http://localhost:8000/api/sessions/{session_id}/chat/stream \
+  -H "Content-Type: application/json" \
+  -d '{"query": "What is this about?", "save_to_history": true}'
+# Streams: data: {"type": "token", "content": "The"}
+#          data: {"type": "token", "content": " document"}
+#          data: {"type": "metadata", "sources": ["doc.pdf"]}
+#          data: [DONE]
+```
+
+**Non-Streaming Query**
 ```bash
 curl -X POST http://localhost:8000/api/sessions/{session_id}/chat \
   -H "Content-Type: application/json" \
@@ -221,7 +278,7 @@ Upload Documents
          │
          ▼
 ┌──────────────────┐
-│  SentenceChunker │  Split by sentences
+│  SmartBoundaryChunker  Token-based (300-600) + metadata
 └────────┬─────────┘
          │
          ▼
@@ -263,6 +320,7 @@ Upload Documents
 - `load.fs` - Filesystem (PDF, HTML, TXT, MD)
 
 ### Chunkers
+- `chunk.smart-boundary` - Token-based with semantic boundary detection (headings, paragraphs, lists, code)
 - `chunk.sentence` - Sentence boundaries
 - `chunk.semantic` - Semantic drift detection
 - `chunk.fixed` - Fixed size chunks
@@ -317,26 +375,53 @@ lsof -i :8000
 echo $NEXT_PUBLIC_API_URL  # Should be http://localhost:8000
 ```
 
-## 📊 Performance Optimizations
+## 📊 Performance & Technical Highlights
 
-- **Max Tokens**: Reduced to 300 tokens (50-70% faster, same quality)
+### Smart Chunking
+- **Token-based**: 300-600 tokens per chunk (not characters) for optimal context
+- **Semantic boundaries**: Respects headings, paragraphs, lists, and code blocks
+- **Rich metadata**: Every chunk includes source path, section title, timestamp, doc type, and auto-summary
+- **Overlap**: 10-15% overlap between chunks to preserve context
+
+### Streaming Architecture
+- **Server-Sent Events (SSE)**: Real-time token streaming from backend to frontend
+- **Visual feedback**: Blinking cursor effect before streaming starts
+- **Token-by-token**: Each token displayed as received for smooth UX
+- **Error handling**: Graceful fallback for non-streaming generators
+
+### Robustness
+- **Auto-recovery**: Detects and fixes corrupted ChromaDB and model cache
+- **Session safety**: Directories auto-created if missing
+- **Type safety**: Full TypeScript on frontend, type hints on backend
+
+### Performance Optimizations
+- **Max Tokens**: 300 tokens (50-70% faster, same quality)
 - **Temperature**: 0.2 for deterministic, faster decoding
 - **Reranking**: Disabled (uses `rerank.noop`) - embeddings already high quality
-- **Retriever**: Reduced to top 5 documents
+- **Retriever**: Top 5 documents after hybrid fusion
 - **Compression**: Intelligent sentence selection with token budgets
 
 See `PERFORMANCE_OPTIMIZATIONS.md` for details.
 
 ## 🚀 Roadmap
 
-- [ ] Streaming chat responses
-- [ ] Document management (delete, update)
-- [ ] Export chat history
-- [ ] Multi-user support
-- [ ] Analytics dashboard
+### ✅ Completed
+- [x] Streaming chat responses (SSE with visual feedback)
+- [x] Session naming and management
+- [x] Smart token-based chunking
+- [x] Rich metadata storage
+- [x] Clear all sessions functionality
+- [x] Auto-recovery for corrupted data
+
+### 🔜 Coming Soon
+- [ ] Document management (delete individual docs, update)
+- [ ] Export chat history (JSON/Markdown)
+- [ ] Multi-user support with authentication
+- [ ] Analytics dashboard (usage stats, performance metrics)
 - [ ] Voice input/output
-- [ ] Image understanding
+- [ ] Image understanding (OCR, vision models)
 - [ ] Custom knowledge graphs
+- [ ] Advanced filtering (by date, doc type, etc.)
 
 ## 📝 License
 
