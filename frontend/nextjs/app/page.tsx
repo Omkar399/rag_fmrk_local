@@ -26,6 +26,7 @@ export default function Home() {
     setSessionId,
     messages,
     addMessage,
+    updateMessage,
     clearMessages,
     isLoading,
     setIsLoading,
@@ -136,18 +137,59 @@ export default function Home() {
         timestamp: new Date(),
       })
 
-      const res = await chat.query(sessionId, userQuery)
-
+      // Add assistant message with empty content (will be filled with streamed tokens)
+      const assistantMessageId = (Date.now() + 1).toString()
       addMessage({
-        id: (Date.now() + 1).toString(),
+        id: assistantMessageId,
         role: 'assistant',
-        content: res.data.answer,
-        sources: res.data.sources,
+        content: '',
+        sources: [],
         timestamp: new Date(),
       })
+
+      // Stop loading indicator now that streaming has started
+      setIsLoading(false)
+
+      let fullContent = ''
+      let sources: string[] = []
+      let tokenCount = 0
+
+      // Stream tokens from the new endpoint
+      for await (const message of chat.stream(sessionId, userQuery)) {
+        if (message.type === 'token') {
+          // Accumulate tokens
+          fullContent += message.content
+          tokenCount++
+          
+          console.log(`📨 Token ${tokenCount}: "${message.content}" (total: ${fullContent.length})`)
+          
+          // Update the message with new streamed content
+          updateMessage(assistantMessageId, {
+            content: fullContent,
+          })
+          
+          // Add a tiny delay to allow React to render
+          await new Promise(resolve => setTimeout(resolve, 0))
+        } else if (message.type === 'metadata') {
+          // Update sources
+          console.log('📌 Metadata received:', message.sources)
+          sources = message.sources || []
+          updateMessage(assistantMessageId, {
+            sources: sources,
+          })
+        } else if (message.type === 'error') {
+          // Handle errors
+          console.error('❌ Error received:', message.content)
+          updateMessage(assistantMessageId, {
+            content: `Error: ${message.content}`,
+          })
+          break
+        }
+      }
+      
+      console.log(`✅ Streaming complete. Total tokens: ${tokenCount}`)
     } catch (error: any) {
       toast.error('Failed to send query')
-    } finally {
       setIsLoading(false)
     }
   }
@@ -321,6 +363,9 @@ export default function Home() {
                           <Card className={msg.role === 'user' ? 'bg-blue-500 text-white border-blue-500 shadow-md' : 'bg-slate-800 text-white'}>
                             <CardContent className="p-3">
                               <div className={`prose ${msg.role === 'assistant' ? 'prose-invert' : ''} max-w-none prose-sm`}>
+                                {!msg.content && msg.role === 'assistant' && (
+                                  <span className="inline-block w-2 h-4 bg-blue-400 animate-pulse rounded-sm"></span>
+                                )}
                                 <ReactMarkdown 
                                   remarkPlugins={[remarkGfm]}
                                   components={{

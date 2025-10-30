@@ -43,7 +43,7 @@ compressor:
   args:
     token_budget: 6000
 
-# LM Studio Configuration - OPTIMIZED FOR SPEED
+# LM Studio Configuration - OPTIMIZED FOR SPEED + STREAMING
 generator:
   component: "gen.lmstudio"
   args:
@@ -52,6 +52,7 @@ generator:
     timeout: 120
     max_tokens: 300        # ⚡ Reduced from 1000 - 50-70% faster, answers still excellent
     temperature: 0.2       # ⚡ Reduced from 0.7 - tighter answers, faster decoding
+    # Note: streaming=True is enabled in pipeline.py for real-time token streaming
 
 prompt:
   system: |

@@ -42,6 +42,7 @@ compressor:
 generator:
   component: "gen.mock"
   args: {}
+  # Note: streaming=True is enabled in pipeline.py when using LM Studio
 
 prompt:
   system: |

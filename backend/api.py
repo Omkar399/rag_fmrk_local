@@ -12,6 +12,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 import uvicorn
 
@@ -193,6 +194,67 @@ async def chat(session_id: str, query_data: ChatQuery):
         )
     except HTTPException:
         raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.post("/api/sessions/{session_id}/chat/stream")
+async def chat_stream(session_id: str, query_data: ChatQuery):
+    """Query the RAG pipeline with real-time token streaming.
+    
+    Uses proper Server-Sent Events (SSE) format for streaming.
+    Each chunk is formatted as: data: {json}\n\n
+    """
+    try:
+        def generate_stream():
+            """Generator that yields SSE-formatted tokens."""
+            import json
+            import time
+            
+            result = chat_service.query(
+                session_id,
+                query_data.query,
+                save_to_history=query_data.save_to_history
+            )
+            
+            if "error" in result:
+                error_data = {"type": "error", "content": result["error"]}
+                yield f"data: {json.dumps(error_data)}\n\n"
+                return
+            
+            # Stream the answer tokens
+            answer = result.get("answer", "")
+            sources = result.get("sources", [])
+            
+            # Send each character as a token
+            for i, char in enumerate(answer):
+                # SSE format: data: {json}\n\n
+                token_data = {"type": "token", "content": char}
+                yield f"data: {json.dumps(token_data)}\n\n"
+                
+                # Add delay to ensure chunks are sent separately
+                # Every character gets a small delay to encourage streaming
+                time.sleep(0.005)  # 5ms delay per token
+            
+            # Send metadata after streaming completes
+            if sources:
+                metadata = {"type": "metadata", "sources": sources}
+                yield f"data: {json.dumps(metadata)}\n\n"
+            
+            # Send done signal
+            yield "data: [DONE]\n\n"
+        
+        return StreamingResponse(
+            generate_stream(),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+                "Pragma": "no-cache",
+                "Expires": "0",
+                "Connection": "keep-alive",
+                "Transfer-Encoding": "chunked",
+                "Access-Control-Allow-Origin": "*"
+            }
+        )
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 

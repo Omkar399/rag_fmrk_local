@@ -84,7 +84,7 @@ class LMStudioGenerator:
             response.raise_for_status()
             
             if stream:
-                # Handle streaming response
+                # Handle streaming response - collect and return
                 full_response = ""
                 for line in response.iter_lines():
                     if line:
@@ -116,6 +116,63 @@ class LMStudioGenerator:
             )
         except Exception as e:
             return f"Error generating response: {str(e)}"
+    
+    def generate_streaming(self, query: str, context: str, system_prompt: Optional[str] = None):
+        """Generate answer using LM Studio - yields tokens in real-time for true streaming."""
+        import requests
+        
+        if system_prompt is None:
+            system_prompt = (
+                "You are a helpful assistant. "
+                "Use only the provided context to answer the question. "
+                "If the context doesn't contain relevant information, say you don't know. "
+                "Provide a clear, concise answer."
+            )
+        
+        # Prepare messages in OpenAI format
+        messages = [
+            {
+                "role": "system",
+                "content": system_prompt
+            },
+            {
+                "role": "user",
+                "content": f"Context:\n{context}\n\nQuestion: {query}"
+            }
+        ]
+        
+        try:
+            response = requests.post(
+                f"{self.base_url}/v1/chat/completions",
+                json={
+                    "model": self.model,
+                    "messages": messages,
+                    "temperature": self.temperature,
+                    "max_tokens": self.max_tokens,
+                    "stream": True  # Always stream for this method
+                },
+                timeout=self.timeout,
+                stream=True
+            )
+            response.raise_for_status()
+            
+            # Yield tokens as they arrive (TRUE STREAMING)
+            for line in response.iter_lines():
+                if line:
+                    try:
+                        import json
+                        chunk = json.loads(line.decode('utf-8').replace('data: ', ''))
+                        if 'choices' in chunk and len(chunk['choices']) > 0:
+                            delta = chunk['choices'][0].get('delta', {})
+                            if 'content' in delta:
+                                yield delta['content']  # ✨ Yield immediately!
+                    except:
+                        pass
+        
+        except requests.exceptions.ConnectionError:
+            yield f"Error: Cannot connect to LM Studio at {self.base_url}"
+        except Exception as e:
+            yield f"Error generating response: {str(e)}"
 
 
 @register("gen.ollama")

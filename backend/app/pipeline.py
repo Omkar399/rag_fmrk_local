@@ -178,12 +178,29 @@ class RAGPipeline:
         print(f"  ✓ Compressed context ({len(context)} chars)")
         
         # Generate answer
-        print("✍️  Generating answer...")
-        answer = self.generator.generate(
-            query_text,
-            context,
-            system_prompt=self.system_prompt
-        )
+        print("✍️  Generating answer...\n")
+        answer = ""
+        
+        # Use streaming if available, otherwise fall back to generate()
+        if hasattr(self.generator, 'generate_streaming'):
+            for token in self.generator.generate_streaming(
+                query_text,
+                context,
+                system_prompt=self.system_prompt
+            ):
+                print(token, end="", flush=True)
+                answer += token
+            print("\n")  # New line after streaming
+        else:
+            # Fallback for generators without streaming
+            answer = self.generator.generate(
+                query_text,
+                context,
+                system_prompt=self.system_prompt,
+                stream=False
+            )
+            print(answer)
+        
         print(f"  ✓ Generated answer")
         
         # Extract source citations
