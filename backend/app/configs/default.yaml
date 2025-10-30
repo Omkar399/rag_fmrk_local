@@ -8,10 +8,11 @@ loader:
     data_dir: "data"
 
 chunker:
-  component: "chunk.sentence"
+  component: "chunk.smart-boundary"
   args:
-    chunk_size: 512
-    overlap: 100
+    chunk_size_tokens: 450
+    overlap_percentage: 0.12
+    model_name: "sentence-transformers/all-MiniLM-L6-v2"
 
 embedder:
   component: "embed.hf"

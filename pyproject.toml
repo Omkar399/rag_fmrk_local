@@ -27,6 +27,7 @@ dependencies = [
     "streamlit-chat>=0.1.1",
     "fastapi>=0.104.0",
     "uvicorn>=0.24.0",
+    "python-multipart>=0.0.6",
 ]
 
 [project.optional-dependencies]
