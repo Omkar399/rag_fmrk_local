@@ -37,14 +37,17 @@ class SessionManager:
         self.sessions_dir = Path(sessions_dir)
         self.sessions_dir.mkdir(parents=True, exist_ok=True)
     
-    def create_session(self) -> str:
+    def create_session(self, name: Optional[str] = None) -> str:
         """Create a new session with isolated storage.
+        
+        Args:
+            name: Optional name for the session
         
         Returns:
             Session ID (UUID string)
             
         Example:
-            >>> session_id = manager.create_session()
+            >>> session_id = manager.create_session(name="My Research")
             >>> print(session_id)
             '550e8400-e29b-41d4-a716-446655440000'
         """
@@ -58,6 +61,7 @@ class SessionManager:
         # Create metadata
         metadata = {
             "session_id": session_id,
+            "name": name,
             "created": datetime.now().isoformat(),
             "updated": datetime.now().isoformat(),
             "documents": [],
@@ -227,7 +231,46 @@ class SessionManager:
         Returns:
             List of session IDs
         """
+        # Create sessions directory if it doesn't exist
+        if not self.sessions_dir.exists():
+            self.sessions_dir.mkdir(parents=True, exist_ok=True)
+            return []
+        
         return [d.name for d in self.sessions_dir.iterdir() if d.is_dir()]
+    
+    def list_sessions_with_names(self) -> List[Dict[str, Optional[str]]]:
+        """List all sessions with their IDs and names.
+        
+        Returns:
+            List of dicts with 'id' and 'name' keys
+        """
+        # Create sessions directory if it doesn't exist
+        if not self.sessions_dir.exists():
+            self.sessions_dir.mkdir(parents=True, exist_ok=True)
+            return []
+        
+        sessions = []
+        for session_dir in self.sessions_dir.iterdir():
+            if session_dir.is_dir():
+                session_id = session_dir.name
+                try:
+                    metadata = self._load_metadata(session_id)
+                    sessions.append({
+                        "id": session_id,
+                        "name": metadata.get("name"),
+                        "created": metadata.get("created", "")
+                    })
+                except:
+                    # If metadata can't be loaded, still include the session
+                    sessions.append({
+                        "id": session_id,
+                        "name": None,
+                        "created": ""
+                    })
+        
+        # Sort by creation time (most recent first)
+        sessions.sort(key=lambda x: x.get("created", ""), reverse=True)
+        return sessions
     
     def delete_session(self, session_id: str) -> None:
         """Delete a session and all its data.

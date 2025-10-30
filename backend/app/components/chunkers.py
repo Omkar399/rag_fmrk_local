@@ -231,8 +231,33 @@ class SmartBoundaryChunker:
         """Load tokenizer from sentence-transformers."""
         try:
             from sentence_transformers import SentenceTransformer
-            model = SentenceTransformer(self.model_name)
-            self.tokenizer = model.tokenizer
+            import os
+            import shutil
+            from pathlib import Path
+            
+            try:
+                model = SentenceTransformer(self.model_name)
+                self.tokenizer = model.tokenizer
+            except (NotImplementedError, RuntimeError) as e:
+                # If model cache is corrupted, clear it and retry
+                if "meta tensor" in str(e) or "Cannot copy out of meta tensor" in str(e):
+                    print(f"⚠️  Model cache corrupted for {self.model_name}, clearing...")
+                    
+                    # Clear the specific model cache
+                    cache_dir = Path.home() / ".cache" / "huggingface" / "hub"
+                    model_dir = cache_dir / f"models--{self.model_name.replace('/', '--')}"
+                    
+                    if model_dir.exists():
+                        shutil.rmtree(model_dir, ignore_errors=True)
+                        print(f"✅ Cleared cache at {model_dir}")
+                    
+                    # Retry download
+                    print(f"📥 Re-downloading {self.model_name}...")
+                    model = SentenceTransformer(self.model_name)
+                    self.tokenizer = model.tokenizer
+                    print(f"✅ Model loaded successfully")
+                else:
+                    raise
         except ImportError:
             raise ImportError("sentence-transformers required for tokenization")
     

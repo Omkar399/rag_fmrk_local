@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { useAppStore } from '@/lib/store'
-import { sessions, documents, chat } from '@/lib/api'
+import { sessions, documents, chat, SessionListItem } from '@/lib/api'
 import { toast } from 'sonner'
 import { 
   MessageCircle, Upload, Plus, Trash2, Send, Loader2, 
@@ -19,6 +19,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 
 export default function Home() {
   const {
@@ -34,9 +35,12 @@ export default function Home() {
 
   const [query, setQuery] = useState('')
   const [docInfo, setDocInfo] = useState<any>(null)
-  const [sessionList, setSessionList] = useState<string[]>([])
+  const [sessionList, setSessionList] = useState<SessionListItem[]>([])
   const [sessionInfo, setSessionInfo] = useState<any>(null)
   const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [showNameDialog, setShowNameDialog] = useState(false)
+  const [showClearAllDialog, setShowClearAllDialog] = useState(false)
+  const [newSessionName, setNewSessionName] = useState('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -56,8 +60,10 @@ export default function Home() {
   const loadSessions = async () => {
     try {
       const res = await sessions.list()
-      setSessionList(res.data)
+      console.log('Sessions loaded:', res.data)
+      setSessionList(res.data || [])
     } catch (error: any) {
+      console.error('Failed to load sessions:', error)
       toast.error('Failed to load sessions')
     }
   }
@@ -76,13 +82,25 @@ export default function Home() {
     }
   }
 
-  const createSession = async () => {
+  const promptForSessionName = () => {
+    setNewSessionName('')
+    setShowNameDialog(true)
+  }
+
+  const createSessionWithName = async () => {
+    if (!newSessionName.trim()) {
+      toast.error('Please enter a session name')
+      return
+    }
+
     try {
-      const res = await sessions.create()
-      setSessionId(res.data)
+      const res = await sessions.create(newSessionName.trim())
+      const newSessionId = res.data
+      setSessionId(newSessionId)
       clearMessages()
       await loadSessions()
-      toast.success('New session created')
+      setShowNameDialog(false)
+      toast.success(`Session "${newSessionName}" created`)
     } catch (error: any) {
       toast.error('Failed to create session')
     }
@@ -98,6 +116,19 @@ export default function Home() {
       toast.success('Session deleted')
     } catch (error: any) {
       toast.error('Failed to delete session')
+    }
+  }
+
+  const clearAllSessions = async () => {
+    try {
+      const res = await sessions.deleteAll()
+      setSessionId(null)
+      clearMessages()
+      await loadSessions()
+      setShowClearAllDialog(false)
+      toast.success(res.data?.message || 'All sessions cleared')
+    } catch (error: any) {
+      toast.error('Failed to clear sessions')
     }
   }
 
@@ -207,7 +238,7 @@ export default function Home() {
         </div>
 
         <div className="flex-1 overflow-hidden flex flex-col p-4 space-y-4">
-          <Button onClick={createSession} size="lg" className="w-full" disabled={isLoading}>
+          <Button onClick={promptForSessionName} size="lg" className="w-full" disabled={isLoading}>
             <Plus className="w-4 h-4 mr-2" /> New Chat
           </Button>
 
@@ -215,20 +246,39 @@ export default function Home() {
             <p className="text-sm font-semibold mb-3 text-muted-foreground">Recent Chats</p>
             <ScrollArea className="h-48">
               <div className="space-y-2 pr-4">
-                {sessionList.map((sid) => (
-                  <Button
-                    key={sid}
-                    variant={sessionId === sid ? 'default' : 'ghost'}
-                    size="sm"
-                    onClick={() => setSessionId(sid)}
-                    className="w-full justify-start text-xs"
-                  >
-                    <MessageCircle className="w-3 h-3 mr-2" />
-                    {sid.slice(0, 8)}...
-                  </Button>
-                ))}
+                {sessionList.filter(s => s && s.id).map((session) => {
+                  const displayName = session.name || (session.id ? session.id.slice(0, 8) + '...' : 'Unnamed')
+                  
+                  return (
+                    <Button
+                      key={session.id}
+                      variant={sessionId === session.id ? 'default' : 'ghost'}
+                      size="sm"
+                      onClick={() => setSessionId(session.id!)}
+                      className="w-full justify-start text-xs truncate"
+                      title={session.name || session.id || 'Unnamed session'}
+                    >
+                      <MessageCircle className="w-3 h-3 mr-2 flex-shrink-0" />
+                      <span className="truncate">
+                        {displayName}
+                      </span>
+                    </Button>
+                  )
+                })}
               </div>
             </ScrollArea>
+            
+            {sessionList.length > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowClearAllDialog(true)}
+                className="w-full mt-2 text-destructive hover:text-destructive"
+              >
+                <Trash2 className="w-3 h-3 mr-2" />
+                Clear All Sessions
+              </Button>
+            )}
           </div>
         </div>
 
@@ -294,7 +344,7 @@ export default function Home() {
               <p className="text-muted-foreground mb-8">
                 Start a new conversation to upload documents and explore them with AI.
               </p>
-              <Button size="lg" onClick={createSession}>
+              <Button size="lg" onClick={promptForSessionName}>
                 <Plus className="w-4 h-4 mr-2" /> Create New Chat
               </Button>
             </div>
@@ -455,6 +505,66 @@ export default function Home() {
           </>
         )}
       </main>
+
+      {/* Session Name Dialog */}
+      <Dialog open={showNameDialog} onOpenChange={setShowNameDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Name Your Chat Session</DialogTitle>
+            <DialogDescription>
+              Give this chat session a memorable name to help you find it later.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Input
+              placeholder="e.g., Research Notes, Client Project, Personal..."
+              value={newSessionName}
+              onChange={(e) => setNewSessionName(e.target.value)}
+              onKeyPress={(e) => {
+                if (e.key === 'Enter') {
+                  createSessionWithName()
+                }
+              }}
+              autoFocus
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowNameDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={createSessionWithName} disabled={!newSessionName.trim()}>
+              Create Session
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Clear All Sessions Confirmation Dialog */}
+      <Dialog open={showClearAllDialog} onOpenChange={setShowClearAllDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Clear All Sessions?</DialogTitle>
+            <DialogDescription>
+              This will permanently delete all {sessionList.length} session{sessionList.length !== 1 ? 's' : ''} and their data including:
+              <ul className="list-disc list-inside mt-2 space-y-1">
+                <li>All uploaded documents</li>
+                <li>Chat history</li>
+                <li>Vector embeddings</li>
+              </ul>
+              <p className="mt-2 font-semibold text-destructive">This action cannot be undone!</p>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowClearAllDialog(false)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={clearAllSessions}>
+              <Trash2 className="w-4 h-4 mr-2" />
+              Clear All Sessions
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

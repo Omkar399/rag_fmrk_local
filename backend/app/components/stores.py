@@ -28,11 +28,27 @@ class ChromaVectorStore:
             os.makedirs(path, exist_ok=True)
             
             # Initialize client with persistent storage
-            self.client = chromadb.PersistentClient(path=path)
-            self.collection = self.client.get_or_create_collection(
-                name=collection_name,
-                metadata={"hnsw:space": "cosine"}
-            )
+            try:
+                self.client = chromadb.PersistentClient(path=path)
+                self.collection = self.client.get_or_create_collection(
+                    name=collection_name,
+                    metadata={"hnsw:space": "cosine"}
+                )
+            except Exception as e:
+                # If ChromaDB is corrupted, clean and retry
+                if "no such table" in str(e).lower() or "database error" in str(e).lower():
+                    print(f"⚠️  ChromaDB corrupted at {path}, reinitializing...")
+                    import shutil
+                    shutil.rmtree(path, ignore_errors=True)
+                    os.makedirs(path, exist_ok=True)
+                    self.client = chromadb.PersistentClient(path=path)
+                    self.collection = self.client.get_or_create_collection(
+                        name=collection_name,
+                        metadata={"hnsw:space": "cosine"}
+                    )
+                    print(f"✅ ChromaDB reinitialized at {path}")
+                else:
+                    raise
         except ImportError:
             raise ImportError("chromadb required for Chroma vector store")
     

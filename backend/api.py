@@ -5,7 +5,7 @@ Exposes SessionManager, DocumentService, and ChatService as REST API.
 
 import sys
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Dict
 
 # Add parent to path
 sys.path.insert(0, str(Path(__file__).parent))
@@ -51,16 +51,23 @@ chat_service = ChatService(manager)
 
 class SessionCreate(BaseModel):
     """Create a new session."""
-    pass
+    name: Optional[str] = None
 
 class SessionResponse(BaseModel):
     """Session information."""
     session_id: str
+    name: Optional[str] = None
     created: str
     documents: List[str]
     indexed_chunks: int
     total_size_bytes: int
     messages_count: int
+
+class SessionListItemResponse(BaseModel):
+    """Session list item."""
+    id: str
+    name: Optional[str] = None
+    created: str
 
 class ChatQuery(BaseModel):
     """Query for chat."""
@@ -84,15 +91,16 @@ class ErrorResponse(BaseModel):
 # ============================================================================
 
 @app.post("/api/sessions", response_model=str)
-async def create_session():
+async def create_session(session_data: Optional[SessionCreate] = None):
     """Create a new session."""
-    session_id = manager.create_session()
+    name = session_data.name if session_data else None
+    session_id = manager.create_session(name=name)
     return session_id
 
-@app.get("/api/sessions")
-async def list_sessions() -> List[str]:
-    """List all sessions."""
-    return manager.list_sessions()
+@app.get("/api/sessions", response_model=List[SessionListItemResponse])
+async def list_sessions():
+    """List all sessions with their names."""
+    return manager.list_sessions_with_names()
 
 @app.get("/api/sessions/{session_id}", response_model=SessionResponse)
 async def get_session(session_id: str):
@@ -101,6 +109,7 @@ async def get_session(session_id: str):
         context = chat_service.get_session_context(session_id)
         return SessionResponse(
             session_id=session_id,
+            name=context.get("name"),
             created=context["created"],
             documents=context["documents"],
             indexed_chunks=context["indexed_chunks"],
@@ -116,6 +125,18 @@ async def delete_session(session_id: str):
     try:
         manager.delete_session(session_id)
         return {"status": "success", "message": f"Session {session_id} deleted"}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.delete("/api/sessions")
+async def delete_all_sessions():
+    """Delete all sessions."""
+    try:
+        session_ids = manager.list_sessions()
+        count = len(session_ids)
+        for session_id in session_ids:
+            manager.delete_session(session_id)
+        return {"status": "success", "message": f"Deleted {count} sessions", "count": count}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
